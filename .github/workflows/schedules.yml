@@ -19,17 +19,32 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install starred
-    - name: get repository name
-      run: echo "REPOSITORY_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
     - name: update repo category by language
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPOSITORY: ${{ env.REPOSITORY_NAME }}
         USERNAME: ${{ github.repository_owner }}
-      run: starred --username ${USERNAME} --repository ${REPOSITORY} --sort --token ${GITHUB_TOKEN} --message "awesome-stars category by language update by github actions cron, created by starred"
+      run: |
+        starred --username ${USERNAME} --sort --token ${GITHUB_TOKEN} > README.md
+        if ! head -n 1 README.md | grep -q "^<!--lint"; then
+          echo "starred failed or output format changed:"
+          cat README.md
+          exit 1
+        fi
     - name: update repo category by topic
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPOSITORY: ${{ env.REPOSITORY_NAME }}
         USERNAME: ${{ github.repository_owner }}
-      run: starred --username ${USERNAME} --repository ${REPOSITORY} --sort --token ${GITHUB_TOKEN} --message "awesome-stars category by topic update by github actions cron, created by starred" --topic --topic_limit 500 --filename topics.md
+      run: |
+        starred --username ${USERNAME} --sort --token ${GITHUB_TOKEN} --topic --topic_limit 500 > topics.md
+        if ! head -n 1 topics.md | grep -q "^<!--lint"; then
+          echo "starred failed or output format changed:"
+          cat topics.md
+          exit 1
+        fi
+    - name: Commit and push changes
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add README.md topics.md
+        git diff --staged --quiet || git commit -m "awesome-stars update by github actions cron"
+        git push
